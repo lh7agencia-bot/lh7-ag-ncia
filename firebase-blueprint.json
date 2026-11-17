@@ -1,0 +1,210 @@
+{
+  "entities": {
+    "Appointment": {
+      "title": "Appointment",
+      "description": "Agendamento de consultoria ou diagnóstico de site e SEO local recebido pela landing page.",
+      "type": "object",
+      "properties": {
+        "clientName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 120,
+          "description": "Nome completo do cliente"
+        },
+        "contact": {
+          "type": "string",
+          "minLength": 6,
+          "maxLength": 120,
+          "description": "Telefone, WhatsApp ou e-mail de contato"
+        },
+        "serviceInterest": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 120,
+          "description": "Serviço de interesse selecionado no agendamento"
+        },
+        "date": {
+          "type": "string",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+          "description": "Data do agendamento no formato YYYY-MM-DD"
+        },
+        "time": {
+          "type": "string",
+          "pattern": "^[0-9]{2}:[0-9]{2}$",
+          "description": "Horário do agendamento no formato HH:MM"
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 500,
+          "description": "Observações opcionais sobre o negócio"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["pendente", "confirmado", "concluido", "cancelado"],
+          "description": "Status atual do agendamento"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp de criação"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp da última atualização"
+        }
+      },
+      "required": ["clientName", "contact", "serviceInterest", "date", "time", "status", "createdAt", "updatedAt"]
+    },
+    "Testimonial": {
+      "title": "Testimonial",
+      "description": "Depoimento de cliente sobre os serviços da lh7 agência.",
+      "type": "object",
+      "properties": {
+        "clientName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 100,
+          "description": "Nome do cliente"
+        },
+        "segment": {
+          "type": "string",
+          "maxLength": 100,
+          "description": "Segmento ou atuação do cliente"
+        },
+        "text": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 600,
+          "description": "Texto do depoimento"
+        },
+        "rating": {
+          "type": "integer",
+          "description": "Nota de 1 a 5 estrelas"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["pendente", "aprovado", "rejeitado"],
+          "description": "Estado de moderação do depoimento"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp de criação"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp da última atualização"
+        }
+      },
+      "required": ["clientName", "text", "rating", "status", "createdAt", "updatedAt"]
+    },
+    "ContactMessage": {
+      "title": "ContactMessage",
+      "description": "Mensagem enviada pelo formulário de contato do site.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 120,
+          "description": "Nome do remetente"
+        },
+        "email": {
+          "type": "string",
+          "minLength": 5,
+          "maxLength": 160,
+          "description": "E-mail do remetente"
+        },
+        "phone": {
+          "type": "string",
+          "maxLength": 40,
+          "description": "Telefone opcional"
+        },
+        "message": {
+          "type": "string",
+          "minLength": 5,
+          "maxLength": 2000,
+          "description": "Conteúdo da mensagem"
+        },
+        "channel": {
+          "type": "string",
+          "enum": ["email", "whatsapp"],
+          "description": "Canal preferido selecionado pelo usuário"
+        },
+        "read": {
+          "type": "boolean",
+          "description": "Indica se a mensagem já foi lida no painel"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp de envio"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp da última atualização"
+        }
+      },
+      "required": ["name", "email", "message", "channel", "read", "createdAt", "updatedAt"]
+    },
+    "FaqItem": {
+      "title": "FaqItem",
+      "description": "Pergunta e resposta exibida no accordion de FAQ do site.",
+      "type": "object",
+      "properties": {
+        "question": {
+          "type": "string",
+          "minLength": 5,
+          "maxLength": 240,
+          "description": "Pergunta frequente"
+        },
+        "answer": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 2000,
+          "description": "Resposta detalhada"
+        },
+        "order": {
+          "type": "integer",
+          "description": "Ordem de exibição no accordion"
+        },
+        "published": {
+          "type": "boolean",
+          "description": "Define se a pergunta está visível no site"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp de criação"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp de atualização"
+        }
+      },
+      "required": ["question", "answer", "order", "published", "createdAt", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/appointments/{appointmentId}": {
+      "schema": { "$ref": "#/entities/Appointment" },
+      "description": "Agendamentos enviados pelos visitantes e gerenciados pelo administrador"
+    },
+    "/testimonials/{testimonialId}": {
+      "schema": { "$ref": "#/entities/Testimonial" },
+      "description": "Depoimentos de clientes com moderação (aprovado/pendente/rejeitado)"
+    },
+    "/messages/{messageId}": {
+      "schema": { "$ref": "#/entities/ContactMessage" },
+      "description": "Mensagens recebidas pelo formulário de contato"
+    },
+    "/faqs/{faqId}": {
+      "schema": { "$ref": "#/entities/FaqItem" },
+      "description": "Perguntas e respostas do FAQ gerenciadas pelo painel administrativo"
+    }
+  }
+}

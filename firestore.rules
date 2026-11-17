@@ -1,0 +1,172 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 1. Global Safety Net (Default Deny)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // 2. Global Hardened Primitives
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isAdmin() {
+      return isVerifiedUser() && (
+        request.auth.token.email == 'lh7agencia@gmail.com' ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    // 3. Entity Validation Blueprints
+    function isValidAppointment(data) {
+      return data.clientName is string && data.clientName.size() >= 2 && data.clientName.size() <= 120
+        && data.contact is string && data.contact.size() >= 6 && data.contact.size() <= 120
+        && data.serviceInterest is string && data.serviceInterest.size() >= 2 && data.serviceInterest.size() <= 120
+        && data.date is string && data.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && data.time is string && data.time.matches('^[0-9]{2}:[0-9]{2}$')
+        && (!('notes' in data) || (data.notes is string && data.notes.size() <= 500))
+        && data.status in ['pendente', 'confirmado', 'concluido', 'cancelado']
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidTestimonial(data) {
+      return data.clientName is string && data.clientName.size() >= 2 && data.clientName.size() <= 100
+        && (!('segment' in data) || (data.segment is string && data.segment.size() <= 100))
+        && data.text is string && data.text.size() >= 10 && data.text.size() <= 600
+        && data.rating is int && data.rating >= 1 && data.rating <= 5
+        && data.status in ['pendente', 'aprovado', 'rejeitado']
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidMessage(data) {
+      return data.name is string && data.name.size() >= 2 && data.name.size() <= 120
+        && data.email is string && data.email.size() >= 5 && data.email.size() <= 160
+        && (!('phone' in data) || (data.phone is string && data.phone.size() <= 40))
+        && data.message is string && data.message.size() >= 5 && data.message.size() <= 2000
+        && data.channel in ['email', 'whatsapp']
+        && data.read is bool
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidFaq(data) {
+      return data.question is string && data.question.size() >= 5 && data.question.size() <= 240
+        && data.answer is string && data.answer.size() >= 10 && data.answer.size() <= 2000
+        && data.order is int && data.order >= 0 && data.order <= 1000
+        && data.published is bool
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    // 4. Collection Rules
+    match /test/connection {
+      allow get: if true;
+    }
+
+    match /admins/{adminId} {
+      allow get: if isValidId(adminId) && isSignedIn() && request.auth.uid == adminId;
+      allow list, create, update, delete: if false;
+    }
+
+    match /appointments/{appointmentId} {
+      allow get: if isValidId(appointmentId) && isAdmin();
+      allow list: if isAdmin();
+      allow create: if isValidId(appointmentId)
+        && incoming().keys().hasAll(['clientName', 'contact', 'serviceInterest', 'date', 'time', 'status', 'createdAt', 'updatedAt'])
+        && incoming().keys().hasOnly(['clientName', 'contact', 'serviceInterest', 'date', 'time', 'notes', 'status', 'createdAt', 'updatedAt'])
+        && isValidAppointment(incoming())
+        && incoming().status == 'pendente'
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(appointmentId)
+        && isAdmin()
+        && isValidAppointment(incoming())
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']) ||
+          incoming().diff(existing()).affectedKeys().hasOnly(['date', 'time', 'status', 'notes', 'updatedAt'])
+        );
+      allow delete: if isValidId(appointmentId) && isAdmin();
+    }
+
+    match /testimonials/{testimonialId} {
+      allow get: if isValidId(testimonialId) && (existing().status == 'aprovado' || isAdmin());
+      allow list: if resource.data.status == 'aprovado' || isAdmin();
+      allow create: if isValidId(testimonialId)
+        && incoming().keys().hasAll(['clientName', 'text', 'rating', 'status', 'createdAt', 'updatedAt'])
+        && incoming().keys().hasOnly(['clientName', 'segment', 'text', 'rating', 'status', 'createdAt', 'updatedAt'])
+        && isValidTestimonial(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && (incoming().status == 'pendente' || isAdmin());
+      allow update: if isValidId(testimonialId)
+        && isAdmin()
+        && isValidTestimonial(incoming())
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']) ||
+          incoming().diff(existing()).affectedKeys().hasOnly(['clientName', 'segment', 'text', 'rating', 'status', 'updatedAt'])
+        );
+      allow delete: if isValidId(testimonialId) && isAdmin();
+    }
+
+    match /messages/{messageId} {
+      allow get: if isValidId(messageId) && isAdmin();
+      allow list: if isAdmin();
+      allow create: if isValidId(messageId)
+        && incoming().keys().hasAll(['name', 'email', 'message', 'channel', 'read', 'createdAt', 'updatedAt'])
+        && incoming().keys().hasOnly(['name', 'email', 'phone', 'message', 'channel', 'read', 'createdAt', 'updatedAt'])
+        && isValidMessage(incoming())
+        && incoming().read == false
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(messageId)
+        && isAdmin()
+        && isValidMessage(incoming())
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['read', 'updatedAt']);
+      allow delete: if isValidId(messageId) && isAdmin();
+    }
+
+    match /faqs/{faqId} {
+      allow get: if isValidId(faqId) && (existing().published == true || isAdmin());
+      allow list: if resource.data.published == true || isAdmin();
+      allow create: if isValidId(faqId)
+        && isAdmin()
+        && incoming().keys().hasAll(['question', 'answer', 'order', 'published', 'createdAt', 'updatedAt'])
+        && incoming().keys().hasOnly(['question', 'answer', 'order', 'published', 'createdAt', 'updatedAt'])
+        && isValidFaq(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(faqId)
+        && isAdmin()
+        && isValidFaq(incoming())
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['question', 'answer', 'order', 'published', 'updatedAt']);
+      allow delete: if isValidId(faqId) && isAdmin();
+    }
+  }
+}
